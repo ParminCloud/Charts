@@ -10,7 +10,7 @@ This chart is based on [DandyDev's Redis HA Chart](https://github.com/DandyDevel
 ## TL;DR
 
 ```bash
-helm repo add parmincloud https://parmincloud.github.io/charts
+helm repo add parmincloud https://ParminCloud.github.io/Charts
 helm install parmincloud/redis-ha
 ```
 
