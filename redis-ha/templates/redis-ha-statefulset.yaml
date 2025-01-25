@@ -83,6 +83,7 @@ spec:
                 matchLabels:
                   app: {{ template "redis-ha.name" . }}
                   release: {{ .Release.Name }}
+                  component: server
                   {{ template "redis-ha.fullname" . }}: replica
               topologyKey: kubernetes.io/hostname
     {{- else }}
@@ -93,6 +94,7 @@ spec:
                   matchLabels:
                     app: {{ template "redis-ha.name" . }}
                     release: {{ .Release.Name }}
+                    component: server
                     {{ template "redis-ha.fullname" . }}: replica
                 topologyKey: kubernetes.io/hostname
     {{- end }}

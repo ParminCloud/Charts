@@ -17,7 +17,7 @@ spec:
       component: sentinel
       release: {{ .Release.Name }}
       app: {{ template "redis-ha.name" . }}
-  serviceName: {{ template "redis-ha.fullname" . }}
+  serviceName: {{ template "redis-ha.fullname" . }}-sentinel
   replicas: {{ .Values.replicas }}
   podManagementPolicy: {{ .Values.podManagementPolicy }}
   updateStrategy:
@@ -28,7 +28,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/init-config: {{ (include "config-sentinel.conf" .) (include "config-init.sh" .) (include "fix-split-brain.sh" .) (include "sentinel_liveness.sh" .) | sha256sum }}
+        checksum/init-config: {{ print (include "config-sentinel.conf" .) (include "config-init.sh" .) (include "fix-split-brain.sh" .) (include "sentinel_liveness.sh" .) | sha256sum }}
       {{- if .Values.podAnnotations }}
 {{ toYaml .Values.podAnnotations | indent 8 }}
       {{- end }}
@@ -74,6 +74,7 @@ spec:
                 matchLabels:
                   app: {{ template "redis-ha.name" . }}
                   release: {{ .Release.Name }}
+                  component: sentinel
                   {{ template "redis-ha.fullname" . }}: replica
               topologyKey: kubernetes.io/hostname
     {{- else }}
@@ -84,6 +85,7 @@ spec:
                   matchLabels:
                     app: {{ template "redis-ha.name" . }}
                     release: {{ .Release.Name }}
+                    component: sentinel
                     {{ template "redis-ha.fullname" . }}: replica
                 topologyKey: kubernetes.io/hostname
     {{- end }}
@@ -376,3 +378,39 @@ spec:
 {{- if .Values.extraVolumes }}
 {{- toYaml .Values.extraVolumes | nindent 6 }}
 {{- end -}}
+{{- if .Values.persistentVolume.enabled }}
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: data
+      annotations:
+      {{- range $key, $value := .Values.persistentVolume.annotations }}
+        {{ $key }}: {{ $value }}
+      {{- end }}
+      labels: {{- toYaml .Values.persistentVolume.labels | nindent 8 }}
+
+    spec:
+      accessModes:
+      {{- range .Values.persistentVolume.accessModes }}
+        - {{ . | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.persistentVolume.size | quote }}
+    {{- if .Values.persistentVolume.storageClass }}
+    {{- if (eq "-" .Values.persistentVolume.storageClass) }}
+      storageClassName: ""
+    {{- else }}
+      storageClassName: "{{ .Values.persistentVolume.storageClass }}"
+    {{- end }}
+{{- end }}
+{{- else if .Values.hostPath.path }}
+      - name: data
+        hostPath:
+          path: {{ tpl .Values.hostPath.path .}}
+{{- else }}
+      - name: data
+        emptyDir:
+{{ toYaml .Values.emptyDir | indent 10 }}
+{{- end }}

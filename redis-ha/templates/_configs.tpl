@@ -344,7 +344,7 @@
     if [ -z "${ANNOUNCE_IP}" ]; then
         "Error: Could not resolve the announce ip for server pod."
         exit 1
-    if [ -z "${SENTINEL_ANNOUNCE_IP}" ]; then
+    elif [ -z "${SENTINEL_ANNOUNCE_IP}" ]; then
         "Error: Could not resolve the announce ip for sentinel pod."
         exit 1
     elif [ "${MASTER}" ]; then
@@ -405,7 +405,7 @@
         {{- if .Values.sentinel.auth }}
           -a "${SENTINELAUTH}" --no-auth-warning \
         {{- end }}
-          -h localhost \
+          -h {{ template "redis-ha.fullname" . }}-sentinel-announce-${HOSTNAME##*-} \
         {{- if (int .Values.sentinel.port) }}
           -p {{ .Values.sentinel.port }} \
         {{- else }}
@@ -471,7 +471,7 @@
 
     identify_announce_ip
 
-    while [ -z "${ANNOUNCE_IP}" || -z ${SENTINEL_ANNOUNCE_IP} ]; do
+    while [[ -z "${ANNOUNCE_IP}" || -z ${SENTINEL_ANNOUNCE_IP} ]]; do
         echo "Error: Could not resolve the announce ip for sentinel/server pod."
         sleep 30
         identify_announce_ip
