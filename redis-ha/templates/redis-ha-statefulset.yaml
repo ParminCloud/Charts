@@ -18,6 +18,7 @@ metadata:
 spec:
   selector:
     matchLabels:
+      component: server
       release: {{ .Release.Name }}
       app: {{ template "redis-ha.name" . }}
   serviceName: {{ template "redis-ha.fullname" . }}
@@ -31,7 +32,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/init-config: {{ print (include "config-redis.conf" .) (include "config-sentinel.conf" .) (include "config-init.sh" .) (include "fix-split-brain.sh" .) (include "redis_liveness.sh" .) (include "redis_readiness.sh" .) (include "sentinel_liveness.sh" .) (include "trigger-failover-if-master.sh" .)| sha256sum }}
+        checksum/init-config: {{ print (include "config-redis.conf" .) (include "config-init.sh" .) (include "redis_liveness.sh" .) (include "redis_readiness.sh" .) (include "trigger-failover-if-master.sh" .) | sha256sum }}
       {{- if .Values.podAnnotations }}
 {{ toYaml .Values.podAnnotations | indent 8 }}
       {{- end }}
@@ -41,6 +42,7 @@ spec:
         prometheus.io/path: {{ .Values.exporter.scrapePath }}
       {{- end }}
       labels:
+        component: server
         release: {{ .Release.Name }}
         app: {{ template "redis-ha.name" . }}
         {{ template "redis-ha.fullname" . }}: replica
@@ -378,161 +380,6 @@ spec:
 {{- end }}
         lifecycle:
 {{ toYaml .Values.redis.lifecycle | indent 10 }}
-      - name: sentinel
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command:
-        {{- if .Values.sentinel.customCommand }}
-{{ toYaml .Values.sentinel.customCommand | indent 10 }}
-        {{- else }}
-          - redis-sentinel
-        {{- end }}
-        args:
-        {{- if .Values.sentinel.customArgs }}
-{{ toYaml .Values.sentinel.customArgs | indent 10 }}
-        {{- else }}
-          - /data/conf/sentinel.conf
-        {{- end }}
-        securityContext: {{- include "compatibility.renderSecurityContext" (dict "secContext" .Values.containerSecurityContext "context" $) | nindent 10 }}
-{{- if or .Values.auth .Values.sentinel.auth}}
-        env:
-  {{- if .Values.auth }}
-        - name: AUTH
-          valueFrom:
-            secretKeyRef:
-            {{- if .Values.existingSecret }}
-              name: {{ .Values.existingSecret }}
-            {{- else }}
-              name: {{ template "redis-ha.fullname" . }}
-            {{- end }}
-              key: {{ .Values.authKey }}
-  {{- end }}
-  {{- if .Values.sentinel.auth }}
-        - name: SENTINELAUTH
-          valueFrom:
-            secretKeyRef:
-            {{- if .Values.sentinel.existingSecret }}
-              name: {{ .Values.sentinel.existingSecret }}
-            {{- else }}
-              name: {{ template "redis-ha.fullname" . }}-sentinel
-            {{- end }}
-              key: {{ .Values.sentinel.authKey }}
-  {{- end }}
-{{- end }}
-        {{- if .Values.sentinel.livenessProbe.enabled }}
-        livenessProbe:
-          initialDelaySeconds: {{ .Values.sentinel.livenessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.sentinel.livenessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.sentinel.livenessProbe.timeoutSeconds }}
-          successThreshold: {{ .Values.sentinel.livenessProbe.successThreshold }}
-          failureThreshold: {{ .Values.sentinel.livenessProbe.failureThreshold }}
-          exec:
-            command:
-              - sh
-              - -c
-              - /health/sentinel_liveness.sh
-        {{- end }}
-        {{- if .Values.sentinel.readinessProbe.enabled }}
-        readinessProbe:
-          initialDelaySeconds: {{ .Values.sentinel.readinessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.sentinel.readinessProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.sentinel.readinessProbe.timeoutSeconds }}
-          successThreshold: {{ .Values.sentinel.readinessProbe.successThreshold }}
-          failureThreshold: {{ .Values.sentinel.readinessProbe.failureThreshold }}
-          exec:
-            command:
-              - sh
-              - -c
-              - /health/sentinel_liveness.sh
-        {{- end }}
-        {{- if .Values.sentinel.startupProbe.enabled }}
-        startupProbe:
-          initialDelaySeconds: {{ .Values.sentinel.startupProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.sentinel.startupProbe.periodSeconds }}
-          timeoutSeconds: {{ .Values.sentinel.startupProbe.timeoutSeconds }}
-          successThreshold: {{ .Values.sentinel.startupProbe.successThreshold }}
-          failureThreshold: {{ .Values.sentinel.startupProbe.failureThreshold }}
-          exec:
-            command:
-              - sh
-              - -c
-              - /health/sentinel_liveness.sh
-        {{- end }}
-        resources:
-{{ toYaml .Values.sentinel.resources | indent 10 }}
-        ports:
-        {{- if ne (int .Values.sentinel.port) 0 }}
-          - name: sentinel
-            containerPort: {{ .Values.sentinel.port }}
-        {{- end }}
-        {{- if .Values.sentinel.tlsPort }}
-          - name: sentinel-tls
-            containerPort: {{ .Values.sentinel.tlsPort }}
-        {{- end }}
-        volumeMounts:
-        - mountPath: /data
-          name: data
-        {{- if .Values.redis.tlsPort }}
-        - mountPath: /tls-certs
-          name: tls-certs
-        {{- end }}
-        - mountPath: /health
-          name: health
-{{- if .Values.sentinel.extraVolumeMounts }}
-{{- toYaml .Values.sentinel.extraVolumeMounts | nindent 8 }}
-{{- end }}
-        lifecycle:
-{{ toYaml .Values.sentinel.lifecycle | indent 10 }}
-
-      - name: split-brain-fix
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        command:
-          - sh
-        args:
-          - /readonly-config/fix-split-brain.sh
-        securityContext: {{- include "compatibility.renderSecurityContext" (dict "secContext" .Values.containerSecurityContext "context" $) | nindent 10 }}
-        env:
-{{- $replicas := int (toString .Values.replicas) -}}
-{{- range $i := until $replicas }}
-        - name: SENTINEL_ID_{{ $i }}
-          value: {{ printf "%s\n%s\nindex: %d" (include "redis-ha.name" $) ($.Release.Name) $i | sha256sum | trunc 40 }}
-{{- end }}
-{{- if .Values.auth }}
-        - name: AUTH
-          valueFrom:
-            secretKeyRef:
-            {{- if .Values.existingSecret }}
-              name: {{ .Values.existingSecret }}
-            {{- else }}
-              name: {{ template "redis-ha.fullname" . }}
-            {{- end }}
-              key: {{ .Values.authKey }}
-{{- end }}
-{{- if .Values.sentinel.auth }}
-        - name: SENTINELAUTH
-          valueFrom:
-            secretKeyRef:
-            {{- if .Values.sentinel.existingSecret }}
-              name: {{ .Values.sentinel.existingSecret }}
-            {{- else }}
-              name: {{ template "redis-ha.fullname" . }}-sentinel
-            {{- end }}
-              key: {{ .Values.sentinel.authKey }}
-{{- end }}
-        resources: 
-          {{- toYaml .Values.splitBrainDetection.resources | nindent 10 }}
-        volumeMounts:
-        - name: config
-          mountPath: /readonly-config
-          readOnly: true
-        - mountPath: /data
-          name: data
-        {{- if .Values.redis.tlsPort }}
-        - mountPath: /tls-certs
-          name: tls-certs
-        {{- end }}
-
 {{- if .Values.exporter.enabled }}
       - name: redis-exporter
         image: "{{ .Values.exporter.image }}:{{ .Values.exporter.tag }}"
