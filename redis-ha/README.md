@@ -2,11 +2,16 @@
 
 [Redis](http://redis.io/) is an advanced key-value cache and store. It is often referred to as a data structure server since keys can contain strings, hashes, lists, sets, sorted sets, bitmaps and hyperloglogs.
 
+This chart is based on [DandyDev's Redis HA Chart](https://github.com/DandyDeveloper/charts/blob/master/charts/redis-ha) with some changes
+
+* [ ] Replacing HAProxy with https://github.com/ParminCloud/haproxy-redis-sentinel
+* [ ] Seperating Sentinel Statefulset to achieve more stability
+
 ## TL;DR
 
 ```bash
-helm repo add dandydev https://dandydeveloper.github.io/charts
-helm install dandydev/redis-ha
+helm repo add parmincloud https://parmincloud.github.io/charts
+helm install parmincloud/redis-ha
 ```
 
 By default this chart install 3 pods total:
@@ -90,7 +95,7 @@ The following table lists the configurable parameters of the Redis chart and the
 | `imagePullSecrets` | Reference to one or more secrets to be used when pulling redis images | list | `[]` |
 | `init.resources` | Extra init resources | object | `{}` |
 | `labels` | Custom labels for the redis pod | object | `{}` |
-| `nameOverride` | Name override for Redis HA resources  | string | `""` |
+| `nameOverride` | Name override for Redis HA resources | string | `""` |
 | `networkPolicy.annotations` | Annotations for NetworkPolicy | object | `{}` |
 | `networkPolicy.egressRules` | user can define egress rules too, uses the same structure as ingressRules | list | `[{"ports":[{"port":53,"protocol":"UDP"},{"port":53,"protocol":"TCP"}],"selectors":[{"namespaceSelector":{}},{"ipBlock":{"cidr":"169.254.0.0/16"}}]}]` |
 | `networkPolicy.egressRules[0].selectors[0]` | Allow all destinations for DNS traffic | object | `{"namespaceSelector":{}}` |
@@ -154,6 +159,7 @@ The following table lists the configurable parameters of the Redis chart and the
 | `redisPassword` | A password that configures a `requirepass` and `masterauth` in the conf parameters (Requires `auth: enabled`) | string | `nil` |
 | `replicas` | Number of redis master/slave | int | `3` |
 | `restore.existingSecret` | Set existingSecret to true to use secret specified in existingSecret above | bool | `false` |
+| `restore.redis.source` |  | string | `""` |
 | `restore.s3.access_key` | Restore init container - AWS AWS_ACCESS_KEY_ID to access restore.s3.source | string | `""` |
 | `restore.s3.region` | Restore init container - AWS AWS_REGION to access restore.s3.source | string | `""` |
 | `restore.s3.secret_key` | Restore init container - AWS AWS_SECRET_ACCESS_KEY to access restore.s3.source | string | `""` |
@@ -248,7 +254,7 @@ The following table lists the configurable parameters of the Redis chart and the
 | `haproxy.hardAntiAffinity` | Whether the haproxy pods should be forced to run on separate nodes. | bool | `true` |
 | `haproxy.image.pullPolicy` | HAProxy Image PullPolicy | string | `"IfNotPresent"` |
 | `haproxy.image.repository` | HAProxy Image Repository | string | `"public.ecr.aws/docker/library/haproxy"` |
-| `haproxy.image.tag` | HAProxy Image Tag | string | `"2.9.4-alpine"` |
+| `haproxy.image.tag` | HAProxy Image Tag | string | `"3.0.7-alpine"` |
 | `haproxy.imagePullSecrets` | Reference to one or more secrets to be used when pulling images ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/ | list | `[]` |
 | `haproxy.init.resources` | Extra init resources | object | `{}` |
 | `haproxy.labels` | Custom labels for the haproxy pod | object | `{}` |
@@ -309,7 +315,7 @@ The following table lists the configurable parameters of the Redis chart and the
 | `exporter.address` | Address/Host for Redis instance. Exists to circumvent issues with IPv6 dns resolution that occurs on certain environments | string | `"localhost"` |
 | `exporter.enabled` | If `true`, the prometheus exporter sidecar is enabled | bool | `false` |
 | `exporter.extraArgs` | Additional args for redis exporter | object | `{}` |
-| `exporter.image` | Exporter image | string | `"oliver006/redis_exporter"` |
+| `exporter.image` | Exporter image | string | `"quay.io/oliver006/redis_exporter"` |
 | `exporter.livenessProbe.httpGet.path` | Exporter liveness probe httpGet path | string | `"/metrics"` |
 | `exporter.livenessProbe.httpGet.port` | Exporter liveness probe httpGet port | int | `9121` |
 | `exporter.livenessProbe.initialDelaySeconds` | Initial delay in seconds for liveness probe of exporter | int | `15` |
@@ -335,7 +341,7 @@ The following table lists the configurable parameters of the Redis chart and the
 | `exporter.serviceMonitor.namespace` | Set the namespace the ServiceMonitor should be deployed | string | `.Release.Namespace` |
 | `exporter.serviceMonitor.telemetryPath` | Set path to redis-exporter telemtery-path (default is /metrics) | string | `""` |
 | `exporter.serviceMonitor.timeout` | Set timeout for scrape (default is 10s) | string | `""` |
-| `exporter.tag` | Exporter image tag | string | `"v1.57.0"` |
+| `exporter.tag` | Exporter image tag | string | `"v1.67.0"` |
 | `prometheusRule.additionalLabels` | Additional labels to be set in metadata. | object | `{}` |
 | `prometheusRule.enabled` | If true, creates a Prometheus Operator PrometheusRule. | bool | `false` |
 | `prometheusRule.interval` | How often rules in the group are evaluated (falls back to `global.evaluation_interval` if not set). | string | `"10s"` |
