@@ -67,7 +67,7 @@
     tls-replication {{ if .Values.sentinel.tlsReplication }}yes{{ else }}no{{ end }}
     {{- end }}
     {{- range $key, $value := .Values.sentinel.config }}
-    {{- if eq "maxclients" $key  }}
+    {{- if eq "maxclients" $key }}
         {{ $key }} {{ $value }}
     {{- else }}
         sentinel {{ $key }} {{ template "redis-ha.masterGroupName" $ }} {{ $value }}
@@ -133,12 +133,12 @@
             echo "  redis master (${1}:${REDIS_PORT})"
             sed -i "2s/^/sentinel monitor ${MASTER_GROUP} ${1} ${REDIS_PORT} ${QUORUM} \\n/" "${SENTINEL_CONF}"
         fi
-        echo "sentinel announce-ip ${ANNOUNCE_IP}" >> ${SENTINEL_CONF}
+        echo "sentinel announce-ip ${SENTINEL_ANNOUNCE_IP}" >> ${SENTINEL_CONF}
         if [ "$SENTINEL_PORT" -eq 0 ]; then
-            echo "  announce (${ANNOUNCE_IP}:${SENTINEL_TLS_PORT})"
+            echo "  announce (${SENTINEL_ANNOUNCE_IP}:${SENTINEL_TLS_PORT})"
             echo "sentinel announce-port ${SENTINEL_TLS_PORT}" >> ${SENTINEL_CONF}
         else
-            echo "  announce (${ANNOUNCE_IP}:${SENTINEL_PORT})"
+            echo "  announce (${SENTINEL_ANNOUNCE_IP}:${SENTINEL_PORT})"
             echo "sentinel announce-port ${SENTINEL_PORT}" >> ${SENTINEL_CONF}
         fi
     }
@@ -285,10 +285,18 @@
         echo "${host}"
     }
 
+    getent_sentinel_hosts() {
+        index=${1:-${INDEX}}
+        service="${SERVICE}-sentinel-announce-${index}"
+        host=$(getent hosts "${service}")
+        echo "${host}"
+    }
+
     identify_announce_ip() {
         echo "Identify announce ip for this pod.."
         echo "  using (${SERVICE}-announce-${INDEX}) or (${SERVICE}-server-${INDEX})"
         ANNOUNCE_IP=$(getent_hosts | awk '{ print $1 }')
+        SENTINEL_ANNOUNCE_IP=$(getent_sentinel_hosts | awk '{ print $1 }')
         echo "  identified announce (${ANNOUNCE_IP})"
     }
 {{- end }}
@@ -301,6 +309,7 @@
     INDEX="${HOSTNAME##*-}"
     SENTINEL_PORT={{ .Values.sentinel.port }}
     ANNOUNCE_IP=''
+    SENTINEL_ANNOUNCE_IP=''
     MASTER=''
     MASTER_GROUP="{{ template "redis-ha.masterGroupName" . }}"
     QUORUM="{{ .Values.sentinel.quorum }}"
@@ -333,7 +342,10 @@
     identify_announce_ip
 
     if [ -z "${ANNOUNCE_IP}" ]; then
-        "Error: Could not resolve the announce ip for this pod."
+        "Error: Could not resolve the announce ip for server pod."
+        exit 1
+    if [ -z "${SENTINEL_ANNOUNCE_IP}" ]; then
+        "Error: Could not resolve the announce ip for sentinel pod."
         exit 1
     elif [ "${MASTER}" ]; then
         find_master
@@ -459,8 +471,8 @@
 
     identify_announce_ip
 
-    while [ -z "${ANNOUNCE_IP}" ]; do
-        echo "Error: Could not resolve the announce ip for this pod."
+    while [ -z "${ANNOUNCE_IP}" || -z ${SENTINEL_ANNOUNCE_IP} ]; do
+        echo "Error: Could not resolve the announce ip for sentinel/server pod."
         sleep 30
         identify_announce_ip
     done
