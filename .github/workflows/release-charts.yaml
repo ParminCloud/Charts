@@ -30,6 +30,5 @@ jobs:
         uses: helm/chart-releaser-action@v1.6.0
         with:
           mark_as_latest: true
-          charts_dir: ${{ github.workspace }}
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"

@@ -14,10 +14,11 @@ helm repo add parmincloud https://parmincloud.github.io/charts
 helm install parmincloud/redis-ha
 ```
 
-By default this chart install 3 pods total:
+By default this chart install 6 pods total:
 
-* one pod containing a redis master and sentinel container (optional prometheus metrics exporter sidecar available)
-* two pods each containing a redis slave and sentinel containers (optional prometheus metrics exporter sidecars available)
+* one pod containing a redis master container (optional prometheus metrics exporter sidecar available)
+* two pods each containing a redis slave container (optional prometheus metrics exporter sidecars available)
+* three pods containing a redis sentinel connected to their corresponding redis server
 
 ## Introduction
 
